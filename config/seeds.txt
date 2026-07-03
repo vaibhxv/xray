@@ -5,5 +5,5 @@
 # follow links within domains listed in CRAWLER_ALLOWED_DOMAINS (if set).
 #
 # Examples (replace with sources you have permission to crawl):
-# https://example-open-access-journal.org/radiology/hand
-# https://example-medical-image-repository.org/pediatric
+https://example-open-access-journal.org/radiology/hand
+https://example-medical-image-repository.org/pediatric
