@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { storageRoot } from '../storage-root';
 
 /**
  * Serves collected files (thumbnails, images, pdfs) from the storage root.
@@ -18,7 +19,7 @@ import * as fs from 'node:fs';
 @Controller('files')
 export class FilesController {
   private storageRoot(): string {
-    return path.resolve(process.env.STORAGE_ROOT ?? './storage');
+    return storageRoot();
   }
 
   @Get('*')

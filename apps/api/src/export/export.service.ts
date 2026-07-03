@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { PrismaService } from '../prisma/prisma.service';
+import { storageRoot } from '../storage-root';
 
 const BATCH = 500;
 
@@ -42,7 +43,7 @@ export class ExportService {
   constructor(private readonly prisma: PrismaService) {}
 
   private storageRoot(): string {
-    return path.resolve(process.env.STORAGE_ROOT ?? './storage');
+    return storageRoot();
   }
 
   /** Return a storage path relative to the storage root (for the manifest). */

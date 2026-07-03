@@ -36,7 +36,17 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
 POSTGRES_DB = os.getenv("POSTGRES_DB", "xray")
 
 # --- Storage ----------------------------------------------------------------
-STORAGE_ROOT = Path(os.getenv("STORAGE_ROOT", str(_REPO_ROOT / "storage"))).resolve()
+def _path(name: str, default: Path) -> Path:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default.resolve()
+    value = Path(raw).expanduser()
+    if value.is_absolute():
+        return value.resolve()
+    return (_REPO_ROOT / value).resolve()
+
+
+STORAGE_ROOT = _path("STORAGE_ROOT", _REPO_ROOT / "storage")
 IMAGES_DIR = STORAGE_ROOT / "images"
 PDFS_DIR = STORAGE_ROOT / "pdfs"
 THUMBS_DIR = STORAGE_ROOT / "thumbnails"
@@ -94,4 +104,9 @@ def dsn() -> str:
 
 def ensure_dirs() -> None:
     for d in (IMAGES_DIR, PDFS_DIR, THUMBS_DIR, HTML_DIR):
-        d.mkdir(parents=True, exist_ok=True)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Cannot create storage directory {d}. Check STORAGE_ROOT in {_REPO_ROOT / '.env'}."
+            ) from exc

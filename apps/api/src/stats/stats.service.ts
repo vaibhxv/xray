@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { statfs } from 'node:fs/promises';
-import * as path from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
 import { StateService } from '../state/state.service';
 import { OverviewStats, LiveStats } from '@xray/shared';
+import { storageRoot } from '../storage-root';
 
 @Injectable()
 export class StatsService {
@@ -13,7 +13,7 @@ export class StatsService {
   ) {}
 
   private storageRoot(): string {
-    return path.resolve(process.env.STORAGE_ROOT ?? './storage');
+    return storageRoot();
   }
 
   private async diskUsage(): Promise<{ used: number; total: number }> {

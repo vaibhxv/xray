@@ -1,10 +1,20 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+const API_ROOT = path.resolve(__dirname, '..', '..');
+const REPO_ROOT = path.resolve(API_ROOT, '..', '..');
+
+function resolveSeedFile(): string {
+  const configured = process.env.SEED_FILE?.trim();
+  if (!configured) return path.join(REPO_ROOT, 'config', 'seeds.txt');
+  if (path.isAbsolute(configured)) return path.resolve(configured);
+  return path.resolve(REPO_ROOT, configured);
+}
+
 /**
  * Load seed URLs from (in priority order):
  *  1. SEED_URLS env var (comma or newline separated)
- *  2. the seed file at SEED_FILE (default ./config/seeds.txt)
+ *  2. the seed file at SEED_FILE (default config/seeds.txt from repo root)
  * Lines starting with '#' are treated as comments.
  */
 export function loadSeeds(): string[] {
@@ -16,7 +26,7 @@ export function loadSeeds(): string[] {
     if (t && !t.startsWith('#')) seeds.add(t);
   }
 
-  const file = path.resolve(process.env.SEED_FILE ?? './config/seeds.txt');
+  const file = resolveSeedFile();
   try {
     if (fs.existsSync(file)) {
       const content = fs.readFileSync(file, 'utf8');

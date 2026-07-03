@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import * as si from 'systeminformation';
-import * as path from 'node:path';
 import { statfs } from 'node:fs/promises';
 import { PrismaService } from '../prisma/prisma.service';
 import { StateService } from '../state/state.service';
 import { SystemMetrics } from '@xray/shared';
+import { storageRoot } from '../storage-root';
 
 @Injectable()
 export class SystemService {
@@ -15,7 +15,7 @@ export class SystemService {
 
   private async diskUsage() {
     try {
-      const s = await statfs(path.resolve(process.env.STORAGE_ROOT ?? './storage'));
+      const s = await statfs(storageRoot());
       const total = s.blocks * s.bsize;
       const free = s.bfree * s.bsize;
       return { used: total - free, total };

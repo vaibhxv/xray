@@ -31,8 +31,13 @@ export class CrawlService {
 
   async start(): Promise<{ paused: boolean; seeded: number }> {
     await this.state.setFlag(STATE_KEYS.PAUSED, '0');
-    const seeded = await this.seedUrls(loadSeeds());
-    this.logger.log(`Crawl started. Seeded ${seeded} new URLs.`);
+    const seeds = loadSeeds();
+    const seeded = await this.seedUrls(seeds);
+    if (seeds.length === 0) {
+      this.logger.warn('Crawl started, but no seed URLs were found.');
+    } else {
+      this.logger.log(`Crawl started. Loaded ${seeds.length} seeds, seeded ${seeded} new URLs.`);
+    }
     return { paused: false, seeded };
   }
 
