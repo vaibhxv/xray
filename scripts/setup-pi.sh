@@ -19,9 +19,18 @@ if [ ! -f .env ]; then
 fi
 
 # Load .env into the current shell (ignoring comments/blank lines).
+# NOTE: we do NOT `source` the file, because values may contain characters
+# that are not valid shell syntax (spaces, parentheses, etc.). Instead we
+# split each line on the first '=' and export the raw value verbatim.
 set -a
-# shellcheck disable=SC1091
-source <(grep -v '^\s*#' .env | grep -v '^\s*$')
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in
+    ''|\#*) continue ;;
+  esac
+  key=${line%%=*}
+  value=${line#*=}
+  export "$key=$value"
+done < .env
 set +a
 
 log "Installing system packages (requires sudo)"
