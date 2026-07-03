@@ -1,0 +1,184 @@
+// Prisma schema — single source of truth for the PostgreSQL database.
+// The Python worker reads/writes these same tables using parameterized SQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CrawlJob {
+  id         String    @id @default(uuid())
+  type       String // discovery | crawl | maintenance
+  status     String    @default("pending") // pending | running | done | failed
+  stats      Json?
+  error      String?
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([type, status])
+  @@map("crawl_jobs")
+}
+
+model Url {
+  id             String    @id @default(uuid())
+  url            String    @unique
+  domain         String?
+  status         String    @default("queued") // queued | in_progress | done | failed | skipped
+  depth          Int       @default(0)
+  priority       Int       @default(0)
+  discoveredFrom String?   @map("discovered_from")
+  attempts       Int       @default(0)
+  lastError      String?   @map("last_error")
+  crawledAt      DateTime? @map("crawled_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  pages Page[]
+
+  @@index([status, priority])
+  @@index([domain])
+  @@map("urls")
+}
+
+model Page {
+  id            String   @id @default(uuid())
+  urlId         String?  @map("url_id")
+  url           String
+  domain        String?
+  title         String?
+  htmlPath      String?  @map("html_path")
+  extractedText String?  @map("extracted_text")
+  lang          String?
+  statusCode    Int?     @map("status_code")
+  fetchedAt     DateTime @default(now()) @map("fetched_at")
+
+  urlRef   Url?       @relation(fields: [urlId], references: [id], onDelete: SetNull)
+  images   Image[]
+  pdfs     Pdf[]
+  metadata Metadata[]
+
+  @@index([domain])
+  @@map("pages")
+}
+
+model Pdf {
+  id            String   @id @default(uuid())
+  pageId        String?  @map("page_id")
+  sourceUrl     String   @map("source_url")
+  domain        String?
+  filePath      String?  @map("file_path")
+  fileSize      Int?     @map("file_size")
+  numPages      Int?     @map("num_pages")
+  sha256        String?
+  ocrStatus     String   @default("pending") @map("ocr_status")
+  extractedText String?  @map("extracted_text")
+  downloadedAt  DateTime @default(now()) @map("downloaded_at")
+
+  page     Page?      @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  metadata Metadata[]
+
+  @@index([domain])
+  @@map("pdfs")
+}
+
+model Image {
+  id             String   @id @default(uuid())
+  pageId         String?  @map("page_id")
+  sourceUrl      String   @map("source_url")
+  pageUrl        String?  @map("page_url")
+  domain         String?
+  filePath       String?  @map("file_path")
+  thumbnailPath  String?  @map("thumbnail_path")
+  width          Int?
+  height         Int?
+  fileSize       Int?     @map("file_size")
+  format         String?
+  sha256         String?
+  phash          String?
+  duplicateGroup String?  @map("duplicate_group")
+  isDuplicate    Boolean  @default(false) @map("is_duplicate")
+  ocrStatus      String   @default("pending") @map("ocr_status")
+  ocrText        String?  @map("ocr_text")
+  metadataStatus String   @default("pending") @map("metadata_status")
+  downloadedAt   DateTime @default(now()) @map("downloaded_at")
+
+  page     Page?      @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  metadata Metadata[]
+
+  @@index([domain])
+  @@index([phash])
+  @@index([sha256])
+  @@index([duplicateGroup])
+  @@map("images")
+}
+
+model Metadata {
+  id                  String   @id @default(uuid())
+  imageId             String?  @map("image_id")
+  pdfId               String?  @map("pdf_id")
+  pageId              String?  @map("page_id")
+  age                 Float?
+  ageText             String?  @map("age_text")
+  sex                 String?
+  caption             String?
+  nearbyText          String?  @map("nearby_text")
+  sourceTitle         String?  @map("source_title")
+  isPediatricHandXray Boolean? @map("is_pediatric_hand_xray")
+  confidence          Float?
+  tags                String[] @default([])
+  summary             String?
+  rawJson             Json?    @map("raw_json")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  image       Image?        @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  pdf         Pdf?          @relation(fields: [pdfId], references: [id], onDelete: SetNull)
+  page        Page?         @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  reviewItems ReviewQueue[]
+
+  @@index([age])
+  @@index([isPediatricHandXray])
+  @@map("metadata")
+}
+
+// Small key/value state shared between the API and the Python worker
+// (live crawl snapshot, pause flag, rehash flag). Replaces Redis.
+model LiveState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("live_state")
+}
+
+// Rolling crawl log. The worker inserts rows; the API reads recent entries and
+// streams new ones to the dashboard over WebSocket. Trimmed nightly.
+model CrawlLog {
+  id      Int      @id @default(autoincrement())
+  ts      DateTime @default(now())
+  level   String
+  stage   String
+  message String
+  url     String?
+
+  @@map("crawl_logs")
+}
+
+model ReviewQueue {
+  id         String    @id @default(uuid())
+  imageId    String?   @map("image_id")
+  metadataId String?   @map("metadata_id")
+  status     String    @default("pending") // pending | accepted | rejected
+  note       String?
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  metadata Metadata? @relation(fields: [metadataId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("review_queue")
+}

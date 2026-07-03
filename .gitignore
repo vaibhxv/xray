@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build output
+dist/
+.next/
+out/
+build/
+
+# Prisma
+apps/api/prisma/*.db
+
+# Collected data (originals + thumbnails). Never commit scraped data.
+storage/images/
+storage/pdfs/
+storage/thumbnails/
+storage/html/
+storage/exports/
+
+# Local LLM models (large binaries)
+models/*.gguf
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store

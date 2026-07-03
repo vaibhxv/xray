@@ -1,0 +1,17 @@
+[Unit]
+Description=X-ray Data Collection API (NestJS)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+# Edit User and WorkingDirectory to match your setup.
+User=pi
+WorkingDirectory=/home/pi/xray-data-collection/apps/api
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

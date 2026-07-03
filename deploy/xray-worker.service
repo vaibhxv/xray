@@ -1,0 +1,15 @@
+[Unit]
+Description=X-ray Data Collection Crawler/Processing Worker (Python)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/xray-data-collection/services/worker
+ExecStart=/home/pi/xray-data-collection/services/worker/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

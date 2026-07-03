@@ -1,0 +1,9 @@
+# Seed URLs for the crawler (one per line). Lines starting with '#' are ignored.
+#
+# Add starting pages of PUBLICLY ACCESSIBLE sources you are permitted to crawl.
+# The crawler will respect robots.txt (CRAWLER_RESPECT_ROBOTS=true) and only
+# follow links within domains listed in CRAWLER_ALLOWED_DOMAINS (if set).
+#
+# Examples (replace with sources you have permission to crawl):
+# https://example-open-access-journal.org/radiology/hand
+# https://example-medical-image-repository.org/pediatric
