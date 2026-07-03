@@ -1,19 +1,45 @@
 """Metadata extraction from surrounding text.
 
 Purpose (per spec): extract age, sex, decide if the page likely contains a
-pediatric hand X-ray, summarize, and generate tags. Uses a local Gemma GGUF
-model via llama.cpp when configured, otherwise a deterministic regex fallback.
-It is NEVER used to interpret image pixels.
+pediatric hand X-ray, summarize, and generate tags. Uses a local Gemma model
+served by Ollama when configured, or a Gemma GGUF via llama.cpp, otherwise a
+deterministic regex fallback. It is NEVER used to interpret image pixels.
 """
 from __future__ import annotations
 
 import json
+import logging
 import re
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Optional
 
 import config
 from extract import HAND_XRAY_HINTS
+
+logger = logging.getLogger("worker.metadata")
+
+# Shared instruction used for both Ollama and llama.cpp.
+_LLM_INSTRUCTION = (
+    "You extract structured metadata from medical text. "
+    "Return ONLY compact JSON with keys: age (number or null, in years), "
+    "sex ('male'/'female'/null), is_pediatric_hand_xray (true/false), "
+    "confidence (0-1), tags (array of short strings), summary (one sentence)."
+)
+
+
+def _parse_json_object(content: str) -> Optional[dict]:
+    """Extract the first JSON object from a model's text output."""
+    content = (content or "").strip()
+    start = content.find("{")
+    end = content.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            return json.loads(content[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    return None
 
 _AGE_YEARS = re.compile(
     r"(?:age[d]?\s*[:=]?\s*)?(\d{1,2})\s*[- ]?(?:years?|yrs?|yo|y/o|year[- ]old)",
@@ -85,14 +111,56 @@ def _keyword_tags(text: str) -> list[str]:
 
 class MetadataExtractor:
     def __init__(self) -> None:
-        self._llm = None
-        self._llm_failed = False
+        self._llm = None  # llama.cpp handle
+        self._llamacpp_failed = False
+        self._ollama_failed = False
 
-    def _ensure_llm(self):
-        if self._llm is not None or self._llm_failed:
+    # --- Ollama provider ----------------------------------------------------
+    def _ollama_extract(self, text: str) -> Optional[dict]:
+        if self._ollama_failed or not config.OLLAMA_MODEL:
+            return None
+        prompt = f"{_LLM_INSTRUCTION}\n\nTEXT:\n{text[:3000]}\n\nJSON:"
+        payload = json.dumps(
+            {
+                "model": config.OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json",  # ask Ollama to constrain output to valid JSON
+                "options": {"temperature": 0.1, "num_ctx": config.LLM_CONTEXT},
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            f"{config.OLLAMA_HOST}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=config.OLLAMA_TIMEOUT) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            return _parse_json_object(body.get("response", ""))
+        except urllib.error.URLError as e:
+            # Connection refused / DNS failure => Ollama isn't running. Disable
+            # this provider so we don't retry (and stall) on every URL.
+            reason = getattr(e, "reason", e)
+            if isinstance(reason, (ConnectionRefusedError, OSError)):
+                self._ollama_failed = True
+                logger.warning(
+                    "Ollama unreachable at %s (%s); falling back to regex extractor.",
+                    config.OLLAMA_HOST,
+                    reason,
+                )
+            return None
+        except Exception:
+            # Transient error (timeout, bad JSON): skip this one, keep provider on.
+            return None
+
+    # --- llama.cpp provider -------------------------------------------------
+    def _ensure_llamacpp(self):
+        if self._llm is not None or self._llamacpp_failed:
             return
         if not config.LLM_MODEL_PATH:
-            self._llm_failed = True
+            self._llamacpp_failed = True
             return
         try:
             from llama_cpp import Llama  # type: ignore
@@ -104,28 +172,33 @@ class MetadataExtractor:
                 verbose=False,
             )
         except Exception:
-            self._llm_failed = True
+            self._llamacpp_failed = True
 
-    def _llm_extract(self, text: str) -> Optional[dict]:
-        self._ensure_llm()
+    def _llamacpp_extract(self, text: str) -> Optional[dict]:
+        self._ensure_llamacpp()
         if self._llm is None:
             return None
-        prompt = (
-            "You extract structured metadata from medical text. "
-            "Return ONLY compact JSON with keys: age (number or null, in years), "
-            "sex ('male'/'female'/null), is_pediatric_hand_xray (true/false), "
-            "confidence (0-1), tags (array of short strings), summary (one sentence).\n\n"
-            f"TEXT:\n{text[:3000]}\n\nJSON:"
-        )
+        prompt = f"{_LLM_INSTRUCTION}\n\nTEXT:\n{text[:3000]}\n\nJSON:"
         try:
             out = self._llm(prompt, max_tokens=256, temperature=0.1, stop=["\n\n"])
-            content = out["choices"][0]["text"].strip()
-            start = content.find("{")
-            end = content.rfind("}")
-            if start >= 0 and end > start:
-                return json.loads(content[start : end + 1])
+            return _parse_json_object(out["choices"][0]["text"])
         except Exception:
             return None
+
+    # --- Provider dispatch --------------------------------------------------
+    def _llm_extract(self, text: str) -> Optional[dict]:
+        provider = config.LLM_PROVIDER
+        if provider == "none":
+            return None
+
+        if provider in ("auto", "ollama") and config.OLLAMA_MODEL:
+            result = self._ollama_extract(text)
+            if result is not None or provider == "ollama":
+                return result
+
+        if provider in ("auto", "llamacpp") and config.LLM_MODEL_PATH:
+            return self._llamacpp_extract(text)
+
         return None
 
     def extract(

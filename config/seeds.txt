@@ -1,9 +1,30 @@
 # Seed URLs for the crawler (one per line). Lines starting with '#' are ignored.
 #
-# Add starting pages of PUBLICLY ACCESSIBLE sources you are permitted to crawl.
-# The crawler will respect robots.txt (CRAWLER_RESPECT_ROBOTS=true) and only
-# follow links within domains listed in CRAWLER_ALLOWED_DOMAINS (if set).
+# These are publicly documented sources of PEDIATRIC HAND / BONE-AGE radiographs
+# and their dataset landing pages. Most host the images behind a "download"
+# link or agreement; the crawler will discover links from these pages, respect
+# robots.txt (CRAWLER_RESPECT_ROBOTS=true), and stay within CRAWLER_ALLOWED_DOMAINS
+# if you set that in .env.
 #
-# Examples (replace with sources you have permission to crawl):
-https://example-open-access-journal.org/radiology/hand
-https://example-medical-image-repository.org/pediatric
+# IMPORTANT: These datasets are provided for ACADEMIC / NON-COMMERCIAL research
+# and education, and each has its own attribution/usage terms. Review and comply
+# with each source's license before collecting or redistributing data.
+
+# --- RSNA Pediatric Bone Age Challenge (2017) — 14,236 hand radiographs -------
+# Data from Stanford, Univ. of Colorado (Children's Hospital Colorado) and UCLA.
+https://www.rsna.org/artificial-intelligence/ai-image-challenge/rsna-pediatric-bone-age-challenge-2017
+
+# --- Bone Age Assessment Resources (BAAR), Uniandes ---------------------------
+# RSNA + RHPE datasets with keypoints, bounding boxes and bone-age annotations.
+https://bcv-uniandes.github.io/baar-wp/
+https://biomedicalcomputervision.uniandes.edu.co/responsible-research/bone-age-assessment/
+https://github.com/BCV-Uniandes/Bonet
+
+# --- RHPE / additional annotated pediatric hand dataset (Brazilian population)-
+https://github.com/TeodoroRafael/BAA_data
+
+# --- Digital Hand Atlas (USC IPILab) — ~1,400 normal children's hand images ---
+https://ipilab.usc.edu/computer-aided-bone-age-assessment-of-children-using-a-digital-hand-atlas-2/
+
+# --- RSNA Bone Age dataset mirror / description (Dataset Ninja) ---------------
+https://datasetninja.com/rsna-bone-age

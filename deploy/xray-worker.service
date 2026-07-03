@@ -1,7 +1,9 @@
 [Unit]
 Description=X-ray Data Collection Crawler/Processing Worker (Python)
-After=network.target postgresql.service
-Wants=postgresql.service
+After=network.target postgresql.service ollama.service
+# ollama.service is optional; if it isn't installed the worker just uses the
+# regex fallback. Listing it here only affects start ordering when present.
+Wants=postgresql.service ollama.service
 
 [Service]
 Type=simple

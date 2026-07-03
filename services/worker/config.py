@@ -64,6 +64,21 @@ MAX_PDF_BYTES = 80 * 1024 * 1024
 PHASH_DISTANCE_THRESHOLD = 6
 
 # --- Local LLM (optional) ---------------------------------------------------
+# Provider selection:
+#   "auto"     -> use Ollama if OLLAMA_MODEL is set & reachable, else llama.cpp
+#                 if LLM_MODEL_PATH is set, else the regex fallback.
+#   "ollama"   -> only use Ollama.
+#   "llamacpp" -> only use a local GGUF via llama-cpp-python.
+#   "none"     -> skip the LLM entirely (regex fallback only).
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "auto").strip().lower()
+
+# Ollama (https://ollama.com) — run a small local model like Gemma on the Pi.
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip().rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "").strip()  # e.g. "gemma3:4b", "gemma2:2b"
+# Pi 5 CPU inference can be slow; allow a generous per-request timeout (seconds).
+OLLAMA_TIMEOUT = _int("OLLAMA_TIMEOUT", 120)
+
+# llama.cpp GGUF (alternative to Ollama).
 LLM_MODEL_PATH = os.getenv("LLM_MODEL_PATH", "").strip()
 LLM_THREADS = _int("LLM_THREADS", 4)
 LLM_CONTEXT = _int("LLM_CONTEXT", 4096)

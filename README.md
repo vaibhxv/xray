@@ -238,17 +238,60 @@ sha256/phash, duplicate group, and the extracted age/sex/caption/candidate flag
 
 ## Optional: local LLM (Gemma) metadata extraction
 
-Better age/sex/candidate extraction is available via a local Gemma GGUF model
-with llama.cpp. It is **text-only** (never used on image pixels).
+The worker can use a small local LLM to extract **more accurate** metadata
+(age, sex, is-pediatric-hand-xray, tags, one-line summary) from the text
+surrounding each image/PDF. This makes the stored dataset cleaner for training a
+model later on a different machine. It is **text-only** — the LLM is *never* run
+on image pixels.
+
+Set `LLM_PROVIDER` in `.env` to pick a backend: `auto` (default), `ollama`,
+`llamacpp`, or `none`. With `auto`, the worker uses Ollama when a model is
+configured and reachable, then llama.cpp, then the deterministic regex extractor.
+
+### Option A — Ollama (recommended on the Pi 5)
+
+```bash
+# Installs Ollama, starts the service, pulls the model, and writes OLLAMA_MODEL to .env
+bash scripts/setup-ollama.sh              # default: gemma3:4b
+# or choose a lighter model for less RAM:
+bash scripts/setup-ollama.sh gemma2:2b    # ~1.6 GB, faster
+bash scripts/setup-ollama.sh gemma3:1b    # ~0.8 GB, lightest
+```
+
+Model sizing on a Pi 5 (CPU-only): pick based on free RAM, since Postgres +
+API + dashboard + worker are also running.
+
+| Model | Approx. RAM | Notes |
+|-------|-------------|-------|
+| `gemma3:1b` | ~1 GB | lightest, fastest, least accurate |
+| `gemma2:2b` | ~2 GB | good balance on an 8 GB Pi |
+| `gemma3:4b` | ~4–5 GB | most accurate here; needs an 8 GB Pi and is slow |
+
+Relevant `.env` keys: `OLLAMA_HOST` (default `http://127.0.0.1:11434`),
+`OLLAMA_MODEL` (e.g. `gemma3:4b`), `OLLAMA_TIMEOUT` (seconds; Pi CPU inference is
+slow, default 120). No extra Python packages are needed — the worker talks to
+Ollama over HTTP. Because inference is slow, consider lowering
+`CRAWLER_CONCURRENCY` so requests don't pile up.
+
+Verify it's working:
+
+```bash
+curl http://127.0.0.1:11434/api/version
+ollama list
+```
+
+### Option B — llama.cpp GGUF
 
 ```bash
 source services/worker/.venv/bin/activate
 pip install llama-cpp-python
-# Download a Gemma 1B 4-bit GGUF into ./models/, then set in .env:
-#   LLM_MODEL_PATH=/absolute/path/to/gemma-1b-q4.gguf
+# Download a Gemma 4-bit GGUF into ./models/, then set in .env:
+#   LLM_PROVIDER=llamacpp
+#   LLM_MODEL_PATH=/absolute/path/to/gemma-q4.gguf
 ```
 
-If `LLM_MODEL_PATH` is empty, the worker uses the regex extractor automatically.
+If no LLM is available (or `LLM_PROVIDER=none`), the worker automatically uses
+the regex extractor — nothing breaks, metadata is just less rich.
 
 ### Optional: JavaScript-rendered pages (Playwright)
 
